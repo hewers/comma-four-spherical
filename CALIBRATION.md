@@ -14,6 +14,8 @@ Run `OPENBLAS_NUM_THREADS=1 nice -n 12 uv run calibration_survey.py` from the re
 
 `uv run segment_optimizer.py SEGMENT` runs a bounded gradient-based cabin yaw fit over all steady windows in one highway segment. It minimizes cross-camera angular motion-plane residuals with a robust loss and checks every third time block separately. Per-iteration yaw changes are limited to 0.25° and the total change to 4°; pitch and roll are locked so the horizon does not move. This is a geometric consistency objective, not a pixel seam loss: direct pixel RMS is only meaningful where both cameras see the same static surface. A candidate and per-window RMS report are saved to `previews/segment-optimizer/`; the batch is untouched.
 
+`OPENBLAS_NUM_THREADS=1 uv run shared_lens_fit.py` fits independent three-axis rotations for wide and cabin while enforcing one shared focal length, principal point, and two radial coefficients. It uses the traced highways and `barrier-reference.json`, keeps the horizons in the objective rather than freezing pitch/roll, and holds out entire drives. Candidate and residuals are in `previews/shared-lens-fit/`. A parameter at its bound is a warning that the available traces do not independently constrain the lens fit. The transferred narrow rotation should be revalidated if adopting the candidate.
+
 Outputs go to `previews/calibration-survey/`. The report requires at least 10 held-out forward segments and 25% improvement in both held-out forward and cabin median errors before recommending a visual review. The survey never changes live calibration or rerenders automatically. If the candidate passes and a multi-drive visual check confirms an improvement, render it into a new output directory so existing drives are not overwritten:
 
 ```sh

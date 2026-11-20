@@ -49,11 +49,13 @@ def match(seg, sift, matcher):
     return a[keep], b[keep]
 
 
-def rays(points, focal, equidistant):
-    p = (points-[672, 380])/focal
+def rays(points, focal, equidistant, center=(672, 380), radial=(0., 0.)):
+    p = (points-center)/focal
     if equidistant:
-        t = np.linalg.norm(p, axis=1)
-        return np.column_stack((p*np.sinc(t[:, None]/np.pi), np.cos(t)))
+        r = np.linalg.norm(p, axis=1)
+        t = r * (1 + radial[0]*r*r + radial[1]*r**4)
+        s = np.divide(np.sin(t), r, out=np.ones_like(r), where=r > 0)
+        return np.column_stack((p*s[:, None], np.cos(t)))
     return unit(np.column_stack((p, np.ones(len(p)))))
 
 

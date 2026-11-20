@@ -107,7 +107,15 @@ def maps(cam, sphere):
     r = np.hypot(x, y)
     theta = np.arctan2(r, z)
     if cam['model'] == 'equidistant':
-        scale = np.divide(theta, r, out=np.ones_like(r), where=r > 1e-8)
+        angle_radius = theta
+        if 'radial' in cam:
+            k1, k2 = cam['radial']
+            rho = np.linspace(0., 2.5, 4096)
+            curve = rho * (1 + k1*rho**2 + k2*rho**4)
+            if np.any(np.diff(curve) <= 0):
+                raise ValueError('fisheye radial model is not monotonic')
+            angle_radius = np.interp(theta, curve, rho).astype(theta.dtype)
+        scale = np.divide(angle_radius, r, out=np.ones_like(r), where=r > 1e-8)
         valid = theta <= np.deg2rad(cam['max_angle'])
     else:
         valid = z > 1e-6
