@@ -59,10 +59,7 @@ Angle from the optical axis at 672 px radius is 87.4°, so each fisheye covers s
 
 ## Earlier attempts
 
-Every earlier candidate (`calibration.json`, `calibration-best.json`, `calibration-shared.json`, the pose-line fit) is superseded. Two problems affected all of them:
-
-- `stitch.py` applied each camera rotation inverted relative to the fitters. Horizons that fitted to within 1° were drawn 3–5° off, and the cabin camera was drawn about 19° off in yaw. Fixed in `maps()`.
-- The cabin and lens fits rested on a few lines traced by eye on half-resolution frames. The focal length ran to its bound and the cabin yaw came out 9° from straight back.
+Ten approaches were tried before this one, including hand-traced lines, window motion vanishing points and delayed landmark matching. `FAILED_ATTEMPTS.md` lists each with the reason it failed, plus the renderer bug that made several of them look worse than they were.
 
 ## Community reference
 

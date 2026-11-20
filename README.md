@@ -11,7 +11,7 @@ Use `--drive ROUTE` to render a single route or `--segment SEGMENT --frames 40 -
 
 Rendering is serial within each drive (`--jobs` caps concurrent drives): rlogs are decompressed one message at a time, camera frames are piped from FFmpeg and composited one output frame at a time, and each encoded segment goes directly to disk. Decoders and frame buffers are released after each segment. Temporary segment MP4s are deleted after concatenation. Allow disk space for two copies of each active drive during concatenation or metadata injection. `--resume` skips already published drives; use a fresh output directory when changing calibration.
 
-The camera calibration is `rig/calibration.json`; see `RIG_CALIBRATION.md` for how it was fitted and validated. The other calibration files in the repository are superseded.
+The camera calibration is `rig/calibration.json`; see `RIG_CALIBRATION.md` for how it was fitted and validated. The approaches that did not work, and why, are listed in `FAILED_ATTEMPTS.md`.
 
 The default output is 4096×2048 (2:1 equirectangular), with a UTC ISO 8601 timestamp in an uncovered region. The final MP4 is tagged as monoscopic spherical equirectangular using Google's Spatial Media tool. If the headset player ignores the tag, select monoscopic 360° mode manually. Where wide and cabin overlap they are averaged 50/50; the narrow road image is drawn on top of the wide image. Areas outside every camera are black; camera translation/parallax and occlusions are not corrected.
 
