@@ -162,11 +162,25 @@ def render(seg, calibration, path, width, limit):
                 raise ValueError(f'{seg}/{k}: calibration image size mismatch: {meta["size"]}')
             warps[k] = maps(calibration[k], sphere)
         covered = np.logical_or.reduce([mask for _, mask in warps.values()])
-        stamp_w = 310
-        stamp = next(((x, y) for y in range(h-26, -1, -8) for x in (10, width-stamp_w-10, (width-stamp_w)//2)
-                      if not covered[y:y+26, x:x+stamp_w].any()), None)
+        external = warps['e'][1]
+        ey = np.flatnonzero(external.any(axis=1))
+        ex = np.flatnonzero(external.any(axis=0))
+        if not len(ex):
+            raise ValueError('empty external camera coverage')
+        stamp_w = max(1, (int(ex[-1])-int(ex[0])+1)//2)
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        sample = '2000-00-00T00:00:00.000Z'
+        scale = stamp_w / cv2.getTextSize(sample, font, 1, 1)[0][0]
+        thickness = max(1, round(2*scale))
+        (tw, th), baseline = cv2.getTextSize(sample, font, scale, thickness)
+        pad = max(2, round(3*scale))
+        stamp_h = th + baseline + 2*pad
+        x = (int(ex[0])+int(ex[-1])+1-tw)//2
+        stamp = next(((x, y+pad+th) for y in range(int(ey[-1])+1+pad, h-stamp_h+1, pad)
+                      if not covered[y:y+stamp_h, x-pad:x+tw+pad].any()), None)
+        del external
         if stamp is None:
-            raise ValueError('no uncovered sphere area for timestamp')
+            raise ValueError('no uncovered area below external camera for timestamp')
         # Use only the bounding rectangle of each camera, and write valid
         # pixels directly into the output without a full-size warped copy.
         regions = {}
@@ -205,7 +219,7 @@ def render(seg, calibration, path, width, limit):
                 for roi, xy in regions[k]:
                     cv2.remap(image, *xy, cv2.INTER_LINEAR, dst=out[roi], borderMode=cv2.BORDER_TRANSPARENT)
             text = dt.datetime.fromtimestamp((int(t)+offset)/1e9,dt.UTC).isoformat(timespec='milliseconds').replace('+00:00','Z')
-            cv2.putText(out,text,(stamp[0],stamp[1]+20),cv2.FONT_HERSHEY_SIMPLEX,.6,(255,255,255),1,cv2.LINE_AA)
+            cv2.putText(out, text, stamp, font, scale, (255,255,255), thickness, cv2.LINE_AA)
             writer.stdin.write(memoryview(out).cast('B'))
         writer.stdin.close()
         if writer.wait():
