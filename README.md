@@ -18,3 +18,9 @@ The default output is 4096×2048 (2:1 equirectangular), with a UTC ISO 8601 time
 Frame timestamps come from the rlog encoder indices and are placed on the UTC clock using rlog clock events (or init data when needed). Sampled `dcamera.hevc` is video only. Audio is AAC in `qcamera.ts`; the qRoad encode timestamp anchors it to the camera timeline. Segments without usable audio get silence. The rlog `Microphone` event in the upstream schema contains sound levels, not waveform samples.
 
 Schemas are adapted from commaai/openpilot revision `ff300ecf785152db7a518ffd959871dab6b6e6d1`; unused vehicle type references are stubbed for standalone log reading.
+
+## License
+
+Everything here is released into the public domain under the [Unlicense](UNLICENSE); no attribution is required.
+
+The Cap'n Proto schemas in `schemas/` are vendored from [commaai/openpilot](https://github.com/commaai/openpilot) and remain under its MIT license, reproduced in `schemas/LICENSE`.
