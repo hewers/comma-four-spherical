@@ -7,6 +7,7 @@ dependencies = [
     "numpy<2.3",
     "opencv-python-headless<5",
     "pycapnp>=2.2.4",
+    "scipy>=1.18.1",
     "spatialmedia",
     "zstandard>=0.25.0",
 ]
