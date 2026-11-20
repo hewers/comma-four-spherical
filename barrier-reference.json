@@ -1,0 +1,8 @@
+{
+  "utc": "2026-11-15T21:47:49.988Z",
+  "segment": "000000e9--6975f83496--34",
+  "image_size": [672, 380],
+  "note": "Manual traces. Wide traces follow the barrier cap and base; cabin trace follows the bright cap through the driver-side window. Frame indices are zero-based.",
+  "e": {"frame": 214, "longitudinal": [[[65,235],[110,232],[175,224],[240,216],[304,207]],[[223,263],[267,242],[298,223],[328,207]]]},
+  "d": {"frame": 214, "longitudinal": [[[509,147],[532,155],[555,163],[579,173],[602,183],[626,197]]]}
+}
