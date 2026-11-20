@@ -156,8 +156,11 @@ def render(seg, calibration, path, width, limit):
     if audio_path.exists() and len(times['q']):
         probe = sp.run([FF, '-hide_banner', '-i', str(audio_path)], capture_output=True, text=True).stderr
         if 'Audio:' in probe:
-            shift = (int(times['q'][0])-int(start))/1e9
-            audio = ['-itsoffset', str(shift), '-i', audio_path]
+            # FFmpeg rejects a negative itsoffset. qRoad sometimes starts a few
+            # microseconds before the high-quality streams; dropping that lead-in
+            # (<1 ms) is below one frame and inaudible.
+            shift = max(0.0, (int(times['q'][0])-int(start))/1e9)
+            audio = ['-itsoffset', f'{shift:.6f}', '-i', audio_path]
     if not audio:
         print(f'{seg}: no usable qcamera audio, writing silence', flush=True)
         audio = ['-f', 'lavfi', '-i', 'anullsrc=r=16000:cl=mono']
