@@ -24,6 +24,8 @@ The camera calibration is `rig/calibration.json`; see `RIG_CALIBRATION.md` for h
 
 The default output is 4096×2048 (2:1 equirectangular), with a UTC ISO 8601 timestamp in an uncovered region. The final MP4 is tagged as monoscopic spherical equirectangular using Google's Spatial Media tool. If the headset player ignores the tag, select monoscopic 360° mode manually. Where wide and cabin overlap they are averaged 50/50; the narrow road image is drawn on top of the wide image. Areas outside every camera are black; camera translation/parallax and occlusions are not corrected.
 
+The raw camera files are not kept in this working copy: they were removed after rendering, and `rlogs/` now holds each segment's `rlog.zst` plus its `qlog.zst` and `qcamera.ts`. Re-rendering needs the original `{d,e,f}camera.hevc` files restored to their segment folders.
+
 Frame timestamps come from the rlog encoder indices and are placed on the UTC clock using rlog clock events (or init data when needed). Sampled `dcamera.hevc` is video only. Audio is AAC in `qcamera.ts`; the qRoad encode timestamp anchors it to the camera timeline. Segments without usable audio get silence. The rlog `Microphone` event in the upstream schema contains sound levels, not waveform samples.
 
 Schemas are adapted from commaai/openpilot revision `ff300ecf785152db7a518ffd959871dab6b6e6d1`; unused vehicle type references are stubbed for standalone log reading.
