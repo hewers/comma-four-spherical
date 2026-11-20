@@ -1,5 +1,14 @@
 # Openpilot drive stitching
 
+![Anonymized equirectangular frame from a forest drive](assets/preview.jpg)
+
+A 4K frame from a forest drive, reduced to 1600×800 for this page. Three comma four cameras are
+projected into one equirectangular view with the calibration in `rig/calibration.json`: the cabin
+camera contributes only scenery seen through the door windows, so the occupants and the rest of the
+interior are never drawn. Black is space no camera sees. Timestamps are omitted here but present in
+the rendered videos. Regenerate with
+`uv run rig_samples.py rig/calibration.json --anonymize --width 1600 --output previews/anon SEGMENT:FRAME`.
+
 From the repository root:
 
 ```sh
