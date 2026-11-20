@@ -151,13 +151,19 @@ def render(seg, calibration, path, width, limit):
             if tuple(calibration[k]['size']) != meta['size']:
                 raise ValueError(f'{seg}/{k}: calibration image size mismatch: {meta["size"]}')
             warps[k] = maps(calibration[k], sphere)
-        writer = sp.Popen(ff('-y', '-f','rawvideo','-pix_fmt','rgb24','-s',f'{width}x{h+32}', '-r','20','-i','pipe:0', *audio,
+        covered = np.logical_or.reduce([mask for _, mask in warps.values()])
+        stamp_w = 310
+        stamp = next(((x, y) for y in range(h-26, -1, -8) for x in (10, width-stamp_w-10, (width-stamp_w)//2)
+                      if not covered[y:y+26, x:x+stamp_w].any()), None)
+        if stamp is None:
+            raise ValueError('no uncovered sphere area for timestamp')
+        writer = sp.Popen(ff('-y', '-f','rawvideo','-pix_fmt','rgb24','-s',f'{width}x{h}', '-r','20','-i','pipe:0', *audio,
                             '-map','0:v', *(['-map','1:a','-c:a','aac','-af','aresample=async=1:first_pts=0,apad'] if audio else []),
                             '-c:v','libx264','-preset','fast','-threads','4','-pix_fmt','yuv420p','-t',str(len(ticks)/20), path), stdin=sp.PIPE)
         positions = dict.fromkeys('edf', -1)
         frames = {}
         for t in ticks:
-            out = np.zeros((h+32,width,3), np.uint8)
+            out = np.zeros((h,width,3), np.uint8)
             for k in 'edf':
                 ts = times[k]
                 i = int(np.clip(np.searchsorted(ts,t),0,len(ts)-1))
@@ -173,7 +179,7 @@ def render(seg, calibration, path, width, limit):
                 mask = warps[k][1]
                 np.copyto(out[:h], frames[k][1], where=mask[:, :, None])
             text = dt.datetime.fromtimestamp((int(t)+offset)/1e9,dt.UTC).isoformat(timespec='milliseconds').replace('+00:00','Z')
-            cv2.putText(out,text,(10,h+23),cv2.FONT_HERSHEY_SIMPLEX,.6,(255,255,255),1,cv2.LINE_AA)
+            cv2.putText(out,text,(stamp[0],stamp[1]+20),cv2.FONT_HERSHEY_SIMPLEX,.6,(255,255,255),1,cv2.LINE_AA)
             writer.stdin.write(out.tobytes())
         writer.stdin.close()
         if writer.wait():
@@ -193,7 +199,7 @@ def main():
     parser.add_argument('--drive', help='route prefix, without final segment number')
     parser.add_argument('--segment', help='render just this segment')
     parser.add_argument('--frames', type=int, help='limit frames per segment for previews')
-    parser.add_argument('--width', type=int, default=1920)
+    parser.add_argument('--width', type=int, default=4096)
     parser.add_argument('--output', type=Path, default=Path('videos'))
     a = parser.parse_args()
     cfg = json.loads(a.calibration.read_text())

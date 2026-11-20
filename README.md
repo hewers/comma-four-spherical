@@ -5,16 +5,16 @@ From the repository root:
 ```sh
 uv sync
 OPENBLAS_CORETYPE=ARMV8 uv run stitch.py calibration-lines.json --solve > calibration.json
-uv run stitch.py calibration.json --width 1280
+uv run stitch.py calibration.json --output videos-4k
 ```
 
-The `OPENBLAS_CORETYPE` override is for the local ARM host. Use `--drive ROUTE` to render a single route or `--segment SEGMENT --frames 40 --output previews` for a short check. The batch sorts each route numerically by segment, skips unreadable or incomplete segments, and publishes `videos/ROUTE.mp4` after the route finishes. Check the render log for gaps. No frames are fabricated for missing segments.
+The `OPENBLAS_CORETYPE` override is for the local ARM host. Use `--drive ROUTE` to render a single route or `--segment SEGMENT --frames 40 --output previews` for a short check. The batch sorts each route numerically by segment, skips unreadable or incomplete segments, and publishes `ROUTE.mp4` in the output directory after the route finishes. Check the render log for gaps. No frames are fabricated for missing segments.
 
 Rendering is serial: rlogs are decompressed one message at a time, camera frames are piped from FFmpeg and composited one output frame at a time, and each encoded segment goes directly to disk. Decoders and frame buffers are released after each segment. Temporary segment MP4s are deleted after the route is assembled; allow disk space for both the temporary segments and the final MP4 during concatenation.
 
 `calibration-lines.json` contains manually traced lane/shoulder lines and poles from `000000ea--f23abe10b0--5`. The solver estimates vanishing directions after lens unprojection and stores a fixed rotation per camera. Intrinsics are based on the openpilot OS04C10 defaults; the fisheye is approximated as equidistant. The cabin rotation **assumes** a 180-degree yaw relative to the wide camera; this is not an independent rear calibration. To fit it independently, remove `reference` and provide measured `longitudinal` and `vertical` parallel-line groups in cabin pixel coordinates. These rotations assume the mount did not move between drives.
 
-The output is an equirectangular image with a separate UTC ISO 8601 strip below it (ordinary MP4, no spherical player metadata). The narrow road image takes priority in the overlap. Areas outside every camera are black; camera translation/parallax and occlusions are not corrected.
+The default output is 4096×2048 (2:1 equirectangular), with a UTC ISO 8601 timestamp in an uncovered region. The ordinary MP4 has no spherical player metadata; select monoscopic 360° mode in the headset player. The narrow road image takes priority in the overlap. Areas outside every camera are black; camera translation/parallax and occlusions are not corrected.
 
 Frame timestamps come from the rlog encoder indices and are placed on the UTC clock using rlog clock events (or init data when needed). Sampled `dcamera.hevc` is video only. Audio is AAC in `qcamera.ts`; the qRoad encode timestamp anchors it to the camera timeline. Segments without usable audio get silence. The rlog `Microphone` event in the upstream schema contains sound levels, not waveform samples.
 
