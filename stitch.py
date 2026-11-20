@@ -3,6 +3,7 @@ import datetime as dt
 import json
 from pathlib import Path
 import re
+import signal
 import struct
 import subprocess as sp
 import tempfile
@@ -73,20 +74,26 @@ def unit(r):
 def frame_basis(cam):
     # Trace at least two parallel physical lines per axis. Each line is a
     # great circle after unprojection; its plane normal constrains the VP.
+    def plane(points):
+        p = (np.asarray(points) - cam['center']) / cam['focal']
+        if cam['model'] == 'equidistant':
+            a = np.linalg.norm(p, axis=1)
+            rays = np.column_stack((p * np.sinc(a[:, None]/np.pi), np.cos(a)))
+        else:
+            rays = unit(np.column_stack((p, np.ones(len(p)))))
+        return np.linalg.svd(rays, full_matrices=True)[2][-1]
+
     def vp(axis):
-        normals = []
-        for line in cam[axis]:
-            p = (np.asarray(line) - cam['center']) / cam['focal']
-            if cam['model'] == 'equidistant':
-                a = np.linalg.norm(p, axis=1)
-                rays = np.column_stack((p * np.sinc(a[:, None]/np.pi), np.cos(a)))
-            else:
-                rays = unit(np.column_stack((p, np.ones(len(p)))))
-            normals.append(np.linalg.svd(rays, full_matrices=True)[2][-1])
+        normals = [plane(line) for line in cam[axis]]
         if len(normals) < 2 or np.linalg.matrix_rank(normals, tol=1e-3) < 2:
             raise ValueError(f'Need distinct {axis} lines')
         return np.linalg.svd(normals)[2][-1]
-    z, y = vp('longitudinal'), vp('vertical')
+    if 'horizon' in cam:
+        y = plane(cam['horizon'])
+        directions = [unit(np.cross(y, plane(line))) for line in cam['longitudinal']]
+        z = unit(sum(d if d[2] >= 0 else -d for d in directions))
+    else:
+        z, y = vp('longitudinal'), vp('vertical')
     z *= (1 if z[2] >= 0 else -1) * cam.get('facing', 1)
     y *= 1 if y[1] >= 0 else -1
     y = unit(y - z * (z @ y))
@@ -205,11 +212,7 @@ def main():
     cfg = json.loads(a.calibration.read_text())
     if a.solve:
         for cam in cfg.values():
-            if 'reference' not in cam:
-                cam['basis'] = frame_basis(cam).tolist()
-        for cam in cfg.values():
-            if 'reference' in cam:
-                cam['basis'] = (np.diag([-1, 1, -1]) @ cfg[cam['reference']]['basis']).tolist()
+            cam['basis'] = frame_basis(cam).tolist()
         print(json.dumps(cfg, indent=2))
         return
     if a.width < 320 or a.width % 4 or (a.frames is not None and a.frames < 1):
@@ -248,4 +251,8 @@ def main():
 
 
 if __name__ == '__main__':
+    def stop(signum, frame):
+        raise SystemExit(128 + signum)
+
+    signal.signal(signal.SIGTERM, stop)
     main()
