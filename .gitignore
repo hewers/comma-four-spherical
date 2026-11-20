@@ -1,0 +1,7 @@
+/[0-9]*--*/
+/rlogs/
+/boot/
+/.venv/
+/__pycache__/
+/previews/
+/videos/
