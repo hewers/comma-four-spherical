@@ -3,6 +3,7 @@ import datetime as dt
 import json
 from pathlib import Path
 import re
+import struct
 import subprocess as sp
 import tempfile
 
@@ -17,14 +18,35 @@ SCHEMA = capnp.load(str(Path(__file__).parent / 'schemas/log.capnp'))
 CAM = {'e': 'wideRoadEncodeIdx', 'd': 'cabinEncodeIdx', 'f': 'narrowRoadEncodeIdx', 'q': 'qNarrowRoadEncodeIdx'}
 
 
+def log_events(path):
+    # Cap'n Proto stream framing: padded segment table followed by words.
+    with path.open('rb') as compressed, zstandard.ZstdDecompressor().stream_reader(compressed) as stream:
+        while header := stream.read(8):
+            if len(header) != 8:
+                raise ValueError('truncated rlog header')
+            count, first = struct.unpack('<II', header)
+            count += 1
+            if count > 512:
+                raise ValueError('invalid rlog segment table')
+            table_size = 4 * (count - 1 + (count % 2 == 0))
+            table = stream.read(table_size)
+            if len(table) != table_size:
+                raise ValueError('truncated rlog segment table')
+            size = 8 * (first + sum(struct.unpack_from(f'<{count-1}I', table)))
+            if size > 64 * 1024 * 1024:
+                raise ValueError('oversized rlog message')
+            body = stream.read(size)
+            if len(body) != size:
+                raise ValueError('truncated rlog message')
+            with SCHEMA.Event.from_bytes(header + table + body) as event:
+                yield event
+
+
 def timing(segment):
     times = {k: [] for k in CAM}
     offsets = []
     fallback = []
-    with Path('rlogs', segment.name, 'rlog.zst').open('rb') as f:
-        raw = zstandard.ZstdDecompressor().stream_reader(f).read()
-    # pycapnp's multi-message reader works on a contiguous buffer.
-    for event in SCHEMA.Event.read_multiple_bytes(raw):
+    for event in log_events(Path('rlogs', segment.name, 'rlog.zst')):
         try:
             kind = event.which()
         except capnp.KjException:
@@ -149,7 +171,7 @@ def render(seg, calibration, path, width, limit):
                     xy, mask = warps[k]
                     frames[k] = (i, cv2.remap(np.frombuffer(data,np.uint8).reshape(ch,w,3), *xy, cv2.INTER_LINEAR))
                 mask = warps[k][1]
-                out[:h][mask] = frames[k][1][mask]
+                np.copyto(out[:h], frames[k][1], where=mask[:, :, None])
             text = dt.datetime.fromtimestamp((int(t)+offset)/1e9,dt.UTC).isoformat(timespec='milliseconds').replace('+00:00','Z')
             cv2.putText(out,text,(10,h+23),cv2.FONT_HERSHEY_SIMPLEX,.6,(255,255,255),1,cv2.LINE_AA)
             writer.stdin.write(out.tobytes())
