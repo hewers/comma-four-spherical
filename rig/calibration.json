@@ -1,0 +1,190 @@
+{
+  "e": {
+    "model": "equidistant",
+    "focal": 454.98803120614576,
+    "center": [
+      668.5269819506354,
+      375.9791096529563
+    ],
+    "radial": [
+      -0.0023973270981605265,
+      0.007956492131183088
+    ],
+    "size": [
+      1344,
+      760
+    ],
+    "max_angle": 92,
+    "basis": [
+      [
+        0.9989507399984012,
+        0.036198794852265986,
+        0.028054702063831538
+      ],
+      [
+        -0.03793012501649914,
+        0.9972379197986025,
+        0.06385794337424885
+      ],
+      [
+        -0.025665632134812877,
+        -0.06485505814506365,
+        0.9975645827514734
+      ]
+    ],
+    "camera_from_device": [
+      [
+        -0.0055512631941823974,
+        0.9999364259359095,
+        -0.009814660639483545
+      ],
+      [
+        0.015727074969155024,
+        0.00990090022766241,
+        0.9998273007312796
+      ],
+      [
+        0.9998609116221433,
+        0.005395948591414315,
+        -0.015781037638106076
+      ]
+    ]
+  },
+  "d": {
+    "model": "equidistant",
+    "focal": 454.98803120614576,
+    "center": [
+      668.5269819506354,
+      375.9791096529563
+    ],
+    "radial": [
+      -0.0023973270981605265,
+      0.007956492131183088
+    ],
+    "size": [
+      1344,
+      760
+    ],
+    "max_angle": 92,
+    "basis": [
+      [
+        -0.9992120357348012,
+        -0.023729756071377176,
+        -0.03181519007497637
+      ],
+      [
+        -0.03295984303852273,
+        0.9426867411676216,
+        0.33204722069856996
+      ],
+      [
+        0.02211235830005214,
+        0.33283420302541294,
+        -0.9427260667377602
+      ]
+    ],
+    "camera_from_device": [
+      [
+        0.0011900610272253431,
+        -0.9997553232129436,
+        0.02208794834595394
+      ],
+      [
+        0.28598831691067483,
+        0.021505677726547965,
+        0.9579917475720344
+      ],
+      [
+        -0.958232365527981,
+        0.00517682652828032,
+        0.285943935277084
+      ]
+    ]
+  },
+  "f": {
+    "model": "pinhole",
+    "focal": 1177.5254563579133,
+    "center": [
+      672.0,
+      380.0
+    ],
+    "size": [
+      1344,
+      760
+    ],
+    "basis": [
+      [
+        0.9989741563668506,
+        0.035532800268094494,
+        0.02807231761446837
+      ],
+      [
+        -0.03709279283451115,
+        0.997675914677352,
+        0.05715674931664097
+      ],
+      [
+        -0.02597613579568611,
+        -0.058139396090921024,
+        0.9979704659915078
+      ]
+    ],
+    "camera_from_device": [
+      [
+        -0.005501547051499751,
+        0.9999299550030277,
+        -0.010479411609596225
+      ],
+      [
+        0.008989193107243908,
+        0.010528599279742142,
+        0.9999041669102532
+      ],
+      [
+        0.9999444621514342,
+        0.005406818366638463,
+        -0.009046487043563815
+      ]
+    ]
+  },
+  "device_from_vehicle": [
+    [
+      -0.031804030739150876,
+      -0.04936335107101076,
+      0.9982743927396833
+    ],
+    [
+      0.9983731998250567,
+      0.045720092135285675,
+      0.03406797684363927
+    ],
+    [
+      -0.04732290671356631,
+      0.9977338987656885,
+      0.047828963547185216
+    ]
+  ],
+  "timing": {
+    "camera_time_offset_s": {
+      "e": 0.019568831858144193,
+      "d": 0.01897521220647438,
+      "f": 0.02027712692536557
+    },
+    "readout_s": 0.02535122544352203
+  },
+  "frames": {
+    "cameras": "e = wide road (ecamera), d = cabin (dcamera), f = narrow road (fcamera); all 1344x760",
+    "image": "pixel (u, v): u right, v down, integer coordinates at pixel centres",
+    "camera": "x right, y down, z along the optical axis",
+    "device": "openpilot device frame: x forward, y right, z down; IMU sample v maps to (-v[2], -v[1], -v[0])",
+    "vehicle": "x right, y down (mean gravity), z forward (mean direction of travel, horizontal)",
+    "equidistant": "p = ((u-cx)/f, (v-cy)/f); rho = |p|; theta = rho*(1 + k1*rho^2 + k2*rho^4); ray = (p/rho*sin(theta), cos(theta)); valid to max_angle degrees",
+    "pinhole": "ray = normalize((u-cx)/f, (v-cy)/f, 1)",
+    "camera_from_device": "ray_camera = camera_from_device @ v_device",
+    "device_from_vehicle": "v_device = device_from_vehicle @ v_vehicle",
+    "basis": "camera_from_vehicle = camera_from_device @ device_from_vehicle; ray_camera = basis @ v_vehicle",
+    "equirectangular": "lon = atan2(x, z), lat = asin(y) of a unit vehicle vector; column = (lon/2pi + 0.5)*W, row = (lat/pi + 0.5)*H",
+    "timing": "gyro time of image row v = (SOF+EOF)/2 + camera_time_offset_s + readout_s*(v/760 - 0.5)",
+    "translation": "not estimated; the three lenses are within a few centimetres of each other"
+  }
+}

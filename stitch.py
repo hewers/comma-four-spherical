@@ -103,14 +103,17 @@ def frame_basis(cam):
 
 
 def maps(cam, sphere):
-    x, y, z = (sphere @ np.asarray(cam['basis'], dtype=sphere.dtype)).transpose(2, 0, 1)
+    # Basis columns are the world axes (right, down, forward) in camera coordinates,
+    # so a world direction s is seen along the camera ray B s, i.e. s @ B.T in row form.
+    # (Fitters go the other way: world = ray @ B.)
+    x, y, z = (sphere @ np.asarray(cam['basis'], dtype=sphere.dtype).T).transpose(2, 0, 1)
     r = np.hypot(x, y)
     theta = np.arctan2(r, z)
     if cam['model'] == 'equidistant':
         angle_radius = theta
         if 'radial' in cam:
             k1, k2 = cam['radial']
-            rho = np.linspace(0., 2.5, 4096)
+            rho = np.linspace(0., 1.05*np.hypot(*cam['size'])/2/cam['focal'], 4096)
             curve = rho * (1 + k1*rho**2 + k2*rho**4)
             if np.any(np.diff(curve) <= 0):
                 raise ValueError('fisheye radial model is not monotonic')
@@ -205,6 +208,8 @@ def render(seg, calibration, path, width, limit):
                 regions[k].append((roi, cv2.convertMaps(*(p[roi] for p in xy), cv2.CV_16SC2)))
             if not regions[k]:
                 raise ValueError(f'{seg}/{k}: empty camera coverage')
+        # Wide and cabin fields overlap only in thin wedges beside the A-pillars; average them there.
+        blend = np.flatnonzero(warps['e'][1] & warps['d'][1])
         del warps, covered, sphere, lon, lat, xy, mask, sub
         writer = sp.Popen(ff('-y', '-f','rawvideo','-pix_fmt','rgb24','-s',f'{width}x{h}', '-r','20','-i','pipe:0', *audio,
                             '-map','0:v', *(['-map','1:a','-c:a','aac','-af','aresample=async=1:first_pts=0,apad'] if audio else []),
@@ -212,9 +217,11 @@ def render(seg, calibration, path, width, limit):
         positions = dict.fromkeys('edf', -1)
         frames = {}
         out = np.empty((h,width,3), np.uint8)
+        flat = out.reshape(-1, 3)
         for t in ticks:
             out.fill(0)
-            for k in 'edf':
+            # Cabin first, then wide (blended 50/50 with cabin where both see), then narrow on top.
+            for k in 'def':
                 ts = times[k]
                 i = int(np.clip(np.searchsorted(ts,t),0,len(ts)-1))
                 if i and abs(t-ts[i-1]) <= abs(t-ts[i]):
@@ -226,6 +233,10 @@ def render(seg, calibration, path, width, limit):
                 image = np.frombuffer(frames[k],np.uint8).reshape(ch,w,3)
                 for roi, xy in regions[k]:
                     cv2.remap(image, *xy, cv2.INTER_LINEAR, dst=out[roi], borderMode=cv2.BORDER_TRANSPARENT)
+                if k == 'd':
+                    cabin = flat[blend]
+                elif k == 'e':
+                    flat[blend] = (cabin.astype(np.uint16) + flat[blend]) >> 1
             text = dt.datetime.fromtimestamp((int(t)+offset)/1e9,dt.UTC).isoformat(timespec='milliseconds').replace('+00:00','Z')
             cv2.putText(out, text, stamp, font, scale, (255,255,255), thickness, cv2.LINE_AA)
             writer.stdin.write(memoryview(out).cast('B'))

@@ -1,3 +1,5 @@
+> **Superseded.** These experiments used hand-traced lines and a renderer that applied rotations inverted. The current calibration and method are in `RIG_CALIBRATION.md`.
+
 # Multi-drive calibration investigation
 
 Run `OPENBLAS_NUM_THREADS=1 nice -n 12 uv run calibration_survey.py` from the repository root while rendering. It samples the first frame of every segment with both forward sources, finds SIFT correspondences, rejects outliers with a homography, and fits relative rotation and wide focal length with robust angular loss. Every fifth route is held out wholesale for validation. Homographies and the ray fit favor dominant scenery and can still be biased by road-plane parallax, so inspect previews as well as residuals.
