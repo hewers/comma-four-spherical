@@ -1,4 +1,5 @@
 import argparse
+from concurrent.futures import ThreadPoolExecutor
 import datetime as dt
 import json
 from pathlib import Path
@@ -6,6 +7,7 @@ import re
 import signal
 import struct
 import subprocess as sp
+import sys
 import tempfile
 
 import capnp
@@ -101,7 +103,7 @@ def frame_basis(cam):
 
 
 def maps(cam, sphere):
-    x, y, z = (sphere @ np.asarray(cam['basis'])).transpose(2, 0, 1)
+    x, y, z = (sphere @ np.asarray(cam['basis'], dtype=sphere.dtype)).transpose(2, 0, 1)
     r = np.hypot(x, y)
     theta = np.arctan2(r, z)
     if cam['model'] == 'equidistant':
@@ -126,8 +128,8 @@ def render(seg, calibration, path, width, limit):
         raise ValueError('missing ' + ', '.join(missing))
     times, offset = timing(seg)
     h = width//2
-    lon, lat = np.meshgrid(((np.arange(width)+.5)/width-.5)*2*np.pi,
-                           ((np.arange(h)+.5)/h-.5)*np.pi)
+    lon, lat = np.meshgrid(((np.arange(width, dtype=np.float32)+.5)/width-.5)*2*np.pi,
+                           ((np.arange(h, dtype=np.float32)+.5)/h-.5)*np.pi)
     sphere = np.stack((np.sin(lon)*np.cos(lat), np.sin(lat), np.cos(lon)*np.cos(lat)), axis=-1)
     start = max(times[k][0] for k in 'edf')
     end = min(times[k][-1] for k in 'edf')
@@ -146,6 +148,7 @@ def render(seg, calibration, path, width, limit):
             shift = (int(times['q'][0])-int(start))/1e9
             audio = ['-itsoffset', str(shift), '-i', audio_path]
     if not audio:
+        print(f'{seg}: no usable qcamera audio, writing silence', flush=True)
         audio = ['-f', 'lavfi', '-i', 'anullsrc=r=16000:cl=mono']
     readers = {}
     writer = None
@@ -164,30 +167,46 @@ def render(seg, calibration, path, width, limit):
                       if not covered[y:y+26, x:x+stamp_w].any()), None)
         if stamp is None:
             raise ValueError('no uncovered sphere area for timestamp')
+        # Use only the bounding rectangle of each camera, and write valid
+        # pixels directly into the output without a full-size warped copy.
+        regions = {}
+        for k, (xy, mask) in warps.items():
+            regions[k] = []
+            spans = ((0, width//2), (width//2, width)) if k == 'd' else ((0, width),)
+            for left, right in spans:
+                sub = mask[:, left:right]
+                xs = np.flatnonzero(sub.any(axis=0))
+                if not len(xs):
+                    continue
+                ys = np.flatnonzero(sub.any(axis=1))
+                roi = np.s_[ys[0]:ys[-1]+1, left+xs[0]:left+xs[-1]+1]
+                regions[k].append((roi, cv2.convertMaps(*(p[roi] for p in xy), cv2.CV_16SC2)))
+            if not regions[k]:
+                raise ValueError(f'{seg}/{k}: empty camera coverage')
+        del warps, covered, sphere, lon, lat, xy, mask, sub
         writer = sp.Popen(ff('-y', '-f','rawvideo','-pix_fmt','rgb24','-s',f'{width}x{h}', '-r','20','-i','pipe:0', *audio,
                             '-map','0:v', *(['-map','1:a','-c:a','aac','-af','aresample=async=1:first_pts=0,apad'] if audio else []),
-                            '-c:v','libx264','-preset','fast','-threads','4','-pix_fmt','yuv420p','-t',str(len(ticks)/20), path), stdin=sp.PIPE)
+                            '-c:v','libx264','-preset','veryfast','-crf','19','-threads','4','-pix_fmt','yuv420p','-t',str(len(ticks)/20), path), stdin=sp.PIPE)
         positions = dict.fromkeys('edf', -1)
         frames = {}
+        out = np.empty((h,width,3), np.uint8)
         for t in ticks:
-            out = np.zeros((h,width,3), np.uint8)
+            out.fill(0)
             for k in 'edf':
                 ts = times[k]
                 i = int(np.clip(np.searchsorted(ts,t),0,len(ts)-1))
                 if i and abs(t-ts[i-1]) <= abs(t-ts[i]):
                     i -= 1
                 while positions[k] < i:
-                    data = next(readers[k])
+                    frames[k] = next(readers[k])
                     positions[k] += 1
-                if k not in frames or frames[k][0] != i:
-                    w, ch = calibration[k]['size']
-                    xy, mask = warps[k]
-                    frames[k] = (i, cv2.remap(np.frombuffer(data,np.uint8).reshape(ch,w,3), *xy, cv2.INTER_LINEAR))
-                mask = warps[k][1]
-                np.copyto(out[:h], frames[k][1], where=mask[:, :, None])
+                w, ch = calibration[k]['size']
+                image = np.frombuffer(frames[k],np.uint8).reshape(ch,w,3)
+                for roi, xy in regions[k]:
+                    cv2.remap(image, *xy, cv2.INTER_LINEAR, dst=out[roi], borderMode=cv2.BORDER_TRANSPARENT)
             text = dt.datetime.fromtimestamp((int(t)+offset)/1e9,dt.UTC).isoformat(timespec='milliseconds').replace('+00:00','Z')
             cv2.putText(out,text,(stamp[0],stamp[1]+20),cv2.FONT_HERSHEY_SIMPLEX,.6,(255,255,255),1,cv2.LINE_AA)
-            writer.stdin.write(out.tobytes())
+            writer.stdin.write(memoryview(out).cast('B'))
         writer.stdin.close()
         if writer.wait():
             raise RuntimeError('FFmpeg encoding failed')
@@ -200,6 +219,7 @@ def render(seg, calibration, path, width, limit):
 
 
 def main():
+    cv2.setNumThreads(2)
     parser = argparse.ArgumentParser()
     parser.add_argument('calibration', type=Path)
     parser.add_argument('--solve', action='store_true', help='fit rotations from annotated parallel lines and print calibration')
@@ -207,6 +227,8 @@ def main():
     parser.add_argument('--segment', help='render just this segment')
     parser.add_argument('--frames', type=int, help='limit frames per segment for previews')
     parser.add_argument('--width', type=int, default=4096)
+    parser.add_argument('--jobs', type=int, choices=range(1, 5), default=1, help='maximum parallel drives')
+    parser.add_argument('--resume', action='store_true', help='skip already published drives in this output directory')
     parser.add_argument('--output', type=Path, default=Path('videos'))
     a = parser.parse_args()
     cfg = json.loads(a.calibration.read_text())
@@ -225,8 +247,26 @@ def main():
     if not routes:
         parser.error('no matching segments')
     a.output.mkdir(parents=True, exist_ok=True)
+    if a.jobs > 1 and len(routes) > 1:
+        def worker(route):
+            args = ['--drive', route, '--width', str(a.width), '--output', str(a.output)]
+            if a.frames:
+                args += ['--frames', str(a.frames)]
+            if a.resume:
+                args += ['--resume']
+            result = sp.run([sys.executable, __file__, str(a.calibration), *args])
+            if result.returncode:
+                print(f'FAILED drive {route}: exit {result.returncode}', flush=True)
+            return result.returncode
+        ordered = sorted(routes, key=lambda route: -len(routes[route]))
+        with ThreadPoolExecutor(max_workers=a.jobs) as pool:
+            failures = sum(code != 0 for code in pool.map(worker, ordered))
+        print(f'Batch finished: {failures} drive process failures; see skipped segments above.', flush=True)
+        return
     for route, segments in sorted(routes.items()):
         dest = a.output / f'{a.segment or route}.mp4'
+        if a.resume and dest.is_file():
+            continue
         with tempfile.TemporaryDirectory(dir=a.output) as tmp:
             tmp = Path(tmp)
             parts = []
@@ -242,12 +282,18 @@ def main():
                     continue
                 parts.append(part.name)
             if not parts:
+                print(f'No renderable segments for {route}', flush=True)
                 continue
             manifest = tmp/'concat.txt'
             manifest.write_text(''.join(f"file '{p}'\n" for p in parts))
             assembled = tmp/'assembled.mp4'
             sp.run(ff('-f','concat','-safe','1','-i',manifest,'-c','copy','-movflags','+faststart',assembled),check=True)
-            assembled.replace(dest)
+            for name in parts:
+                (tmp/name).unlink()
+            tagged = tmp/'spherical.mp4'
+            sp.run([sys.executable, '-m', 'spatialmedia', '-i', str(assembled), str(tagged)], check=True)
+            tagged.replace(dest)
+            print(f'Published {dest}', flush=True)
 
 
 if __name__ == '__main__':

@@ -164,6 +164,7 @@ dependencies = [
     { name = "numpy" },
     { name = "opencv-python-headless" },
     { name = "pycapnp" },
+    { name = "spatialmedia" },
     { name = "zstandard" },
 ]
 
@@ -173,6 +174,7 @@ requires-dist = [
     { name = "numpy", specifier = "<2.3" },
     { name = "opencv-python-headless", specifier = "<5" },
     { name = "pycapnp", specifier = ">=2.2.4" },
+    { name = "spatialmedia", git = "https://github.com/google/spatial-media.git" },
     { name = "zstandard", specifier = ">=0.25.0" },
 ]
 
@@ -247,6 +249,11 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/f2/dd/75098b348065f6de8a62afcab73587c7a082b0e83e7015b3c3318a8fa5ab/pycapnp-2.2.4-cp314-cp314t-win32.whl", hash = "sha256:87ec866daf3368e424c911b571faae720e02ac7ac7ac4c9d32d4937a48d5b22e", size = 1783626, upload-time = "2026-07-03T22:47:09.9Z" },
     { url = "https://files.pythonhosted.org/packages/21/3c/f766e102bd6c7c2e4b23117fc86139e304d010ddd1aae2345beef9051ea1/pycapnp-2.2.4-cp314-cp314t-win_amd64.whl", hash = "sha256:fbf5e9b3fb43300569a04d015355a3462becb421275a6bd9bf19cb304198e4ad", size = 1955860, upload-time = "2026-07-03T22:47:11.321Z" },
 ]
+
+[[package]]
+name = "spatialmedia"
+version = "2.1a1"
+source = { git = "https://github.com/google/spatial-media.git#2308497c39bb604a7c3ba56ac17e302f2b1b6a96" }
 
 [[package]]
 name = "zstandard"

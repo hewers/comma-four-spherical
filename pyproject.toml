@@ -7,5 +7,9 @@ dependencies = [
     "numpy<2.3",
     "opencv-python-headless<5",
     "pycapnp>=2.2.4",
+    "spatialmedia",
     "zstandard>=0.25.0",
 ]
+
+[tool.uv.sources]
+spatialmedia = { git = "https://github.com/google/spatial-media.git" }
