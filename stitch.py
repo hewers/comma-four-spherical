@@ -149,7 +149,8 @@ def render(seg, calibration, path, width, limit):
         ticks = ticks[:limit]
     if not len(ticks):
         raise ValueError(f'{seg}: no common camera time')
-    audio_path = seg/'qcamera.ts'
+    # qcamera.ts normally sits beside the camera files; older imports keep it in rlogs/.
+    audio_path = next((p for p in (seg/'qcamera.ts', Path('rlogs', seg.name, 'qcamera.ts')) if p.exists()), seg/'qcamera.ts')
     # A TS audio/video offset is preserved by FFmpeg. The first qRoad
     # capture time anchors that container to the high-quality streams.
     audio = []
